@@ -9,15 +9,19 @@ namespace GalacticScale
         [HarmonyPrefix, HarmonyPatch(typeof(PlanetModelingManager), nameof(PlanetModelingManager.EndPlanetScanThread))]
         public static bool EndPlanetScanThread()
         {
-            Queue<PlanetData> queue = PlanetModelingManager.scnPlanetReqList;
+            Queue<PlanetData> queue = scnPlanetReqList;
             lock (queue)
             {
-                PlanetModelingManager.scnPlanetReqList.Clear();
+                scnPlanetReqList.Clear();
             }
-            PlanetModelingManager.ThreadFlagLock threadFlagLock = PlanetModelingManager.planetScanThreadFlagLock;
+            ThreadFlagLock threadFlagLock = planetScanThreadFlagLock;
             lock (threadFlagLock)
             {
-                PlanetModelingManager.planetScanThreadFlag = PlanetModelingManager.ThreadFlag.Ending;
+                // Change: If the ThreadFlag is already ended, don't change it to ending
+                if (planetScanThreadFlag == ThreadFlag.Running)
+                {
+                    planetScanThreadFlag = ThreadFlag.Ending;
+                }
             }
             return false;
         }

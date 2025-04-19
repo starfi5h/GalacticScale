@@ -85,6 +85,12 @@ namespace GalacticScale
 
         public static void ScanPlanetGS(PlanetData calcPlanet)
         {
+            if (calcPlanet.loaded || calcPlanet.loading || calcPlanet.runtimeVeinGroups != null)
+            {
+                calcPlanet.NotifyLoaded();
+                return;
+            }
+
             // Note: We don't use vanilla's GetUnloadedCopy method, as it will not get the correct GS2 
             PlanetAlgorithm planetAlgorithm = Algorithm(calcPlanet);
 
@@ -95,35 +101,53 @@ namespace GalacticScale
                 HighStopwatch highStopwatch = new HighStopwatch();
 
                 // Calculate landPercent
-                highStopwatch.Begin();                                
-                calcPlanet.data = new PlanetRawData(calcPlanet.precision);
-                calcPlanet.modData = calcPlanet.data.InitModData(calcPlanet.modData);
-                calcPlanet.data.CalcVerts();
-                calcPlanet.aux = new PlanetAuxData(calcPlanet);
-                planetAlgorithm.GenerateTerrain(calcPlanet.mod_x, calcPlanet.mod_y);
-                planetAlgorithm.CalcWaterPercent();
-                double duration = highStopwatch.duration;
+                highStopwatch.Begin();
+                bool isDataNull = false;
+                if (calcPlanet.data == null)
+                {
+                    calcPlanet.data = new PlanetRawData(calcPlanet.precision);
+                    calcPlanet.modData = calcPlanet.data.InitModData(calcPlanet.modData);
+                    calcPlanet.data.CalcVerts();
+                    calcPlanet.aux = new PlanetAuxData(calcPlanet);
+                    planetAlgorithm.GenerateTerrain(calcPlanet.mod_x, calcPlanet.mod_y);
+                    planetAlgorithm.CalcWaterPercent();
+                    isDataNull = true;
+                }
+                else
+                {
+                    GS2.Warn($"planet {calcPlanet.displayName} data is not null!");
+                }
+                double durationTerrain = highStopwatch.duration;
 
                 // Calculate vege
                 highStopwatch.Begin();
-                calcPlanet.data.vegeCursor = 1;
-                if (calcPlanet.type != EPlanetType.Gas) planetAlgorithm.GenerateVegetables();
-                double duration2 = highStopwatch.duration;
+                if (isDataNull)
+                {
+                    calcPlanet.data.vegeCursor = 1;
+                    if (calcPlanet.type != EPlanetType.Gas) planetAlgorithm.GenerateVegetables();
+                }
+                double durationVege = highStopwatch.duration;
 
                 // Calculate resource count
                 highStopwatch.Begin();
-                calcPlanet.data.veinCursor = 1;
-                if (calcPlanet.type != EPlanetType.Gas) planetAlgorithm.GenerateVeins();
-                calcPlanet.SummarizeVeinGroups();
-                calcPlanet.GenBirthPoints();
-                CleanPlanetDataForScan(calcPlanet);
-                double duration3 = highStopwatch.duration;
+                if (calcPlanet.veinGroups == null)
+                {
+                    calcPlanet.data.veinCursor = 1;
+                    if (calcPlanet.type != EPlanetType.Gas) planetAlgorithm.GenerateVeins();
+                    calcPlanet.SummarizeVeinGroups();
+                    calcPlanet.GenBirthPoints();
+                }
+                if (isDataNull)
+                {
+                    CleanPlanetDataForScan(calcPlanet);
+                }
+                double durationVeins = highStopwatch.duration;
 
                 if (planetScanThreadLogs != null)
                 {
                     lock (planetScanThreadLogs)
                     {
-                        string timerMessage = $"[Terrain]:{duration:F3}s [Vegetables]:{duration2:F3}s [Veins]:{duration3:F3}s  Planet: {calcPlanet.displayName}";
+                        string timerMessage = $"[Terrain]:{durationTerrain:F3}s [Vegetables]:{durationVege:F3}s [Veins]:{durationVeins:F3}s  Planet: {calcPlanet.displayName}";
                         planetScanThreadLogs.Add(timerMessage);
                     }
                 }
